@@ -2,29 +2,29 @@ name: Node CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    - name: Install Dependencies
-      run: npm install
+      - name: Install Dependencies
+        run: npm install
 
-    - name: Run Tests
-      run: npm test
+      - name: Run Tests
+        run: npm test
 
-   steps:
-      - name: Login to Docker Hub
+      - name: Login DockerHub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Image
@@ -34,16 +34,16 @@ jobs:
         run: docker push ${{ secrets.DOCKER_USERNAME }}/node-cicd-app:latest
 
       - name: Configure Kubeconfig
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
 
-        - name: Deploy to Kubernetes
+      - name: Deploy to Kubernetes
         run: kubectl apply -f deployment.yaml
 
-        - name: Check Rollout
+      - name: Check Rollout
         run: kubectl rollout status deployment/node-app
 
-        - name: Rollback if Failed
-      if: failure()
-      run: kubectl rollout undo deployment/node-app
+      - name: Rollback if Failed
+        if: failure()
+        run: kubectl rollout undo deployment/node-app
