@@ -1,4 +1,4 @@
-name: Node CI/CD Pipeline
+name: Node.js CI/CD Pipeline
 
 on:
   push:
@@ -6,44 +6,59 @@ on:
       - main
 
 jobs:
-  build-deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
+    env:
+      IMAGE_NAME: node-cicd-app
+
     steps:
+      # Checkout Source Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      # Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: npm
 
+      # Install Dependencies
       - name: Install Dependencies
         run: npm install
 
+      # Run Tests
       - name: Run Tests
         run: npm test
 
-      - name: Login DockerHub
-       run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      # Login DockerHub
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/node-cicd-app:latest .
+      # Build Docker Image
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest .
 
-      - name: Push Image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/node-cicd-app:latest
+      # Push Docker Image
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
+      # Setup Kubernetes Config
       - name: Configure Kubeconfig
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
 
-      - name: Deploy to Kubernetes
+      # Deploy to Kubernetes
+      - name: Deploy Application
         run: kubectl apply -f deployment.yaml
 
-      - name: Check Rollout
-        run: kubectl rollout status deployment/node-app
+      # Verify Rollout
+      - name: Verify Deployment
+        run: kubectl rollout status deployment/node-app --timeout=120s
 
-      - name: Rollback if Failed
+      # Rollback if Failed
+      - name: Rollback Deployment
         if: failure()
         run: kubectl rollout undo deployment/node-app
